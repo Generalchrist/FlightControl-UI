@@ -9,13 +9,17 @@ import { IoIosAirplane } from "react-icons/io";
 export default function FlightMap() {
   const [flightsDisplayed, setFlightsDisplayed] = useState<any[]>([]);
   const [currentBounds, setCurrentBounds] = useState<LatLngBounds | null>(null);
-  const flightsRef = useRef<Map<string, any>>(new Map()); 
-  const [message, setMessage] = useState<string>("");
-  const [selectedFlight, setSelectedFlight] = useState<any | null>(null);
+  const [message, setMessage] = useState("");
+  const flightsRef = useRef<Map<string, any>>(new Map()); // Persistent storage for planes
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<any>(null);
 
   const map = useMapEvents({
     moveend: () => {
       if (map) setCurrentBounds(map.getBounds());
+    },
+    locationfound: (event) => {
+      setCurrentLocation(event.latlng); // Set the current location on map
     },
   });
 
@@ -33,7 +37,7 @@ export default function FlightMap() {
           flightsRef.current.set(newPlane.plane_id, newPlane);
         });
 
-
+        // Update the displayed planes only if they are within the current map bounds
         if (currentBounds) {
           setFlightsDisplayed(
             Array.from(flightsRef.current.values()).filter((flight) =>
@@ -50,42 +54,12 @@ export default function FlightMap() {
       console.log("WebSocket connection closed");
     });
 
+    setSocket(newSocket);
+
     return () => {
       newSocket.close();
     };
-  }, [currentBounds]); 
-
-  const sendNotification = async () => {
-    if (!selectedFlight) return;
-
-    const payload = {
-      plane_id: selectedFlight.plane_id,
-      latitude: selectedFlight.location.latitude,
-      longitude: selectedFlight.location.longitude,
-      message,
-    };
-
-    try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/send_notification/",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (response.ok) {
-        alert("Notification sent successfully!");
-        setMessage("");
-      } else {
-        alert("Failed to send notification.");
-      }
-    } catch (error) {
-      console.error("Error sending notification:", error);
-      alert("Error sending notification.");
-    }
-  };
+  }, [currentBounds]); // Update only when WebSocket gets new data or bounds change
 
   const flightIcon = divIcon({
     className: "flight-icon",
@@ -94,6 +68,19 @@ export default function FlightMap() {
     ),
   });
 
+  const handleSendMessage = () => {
+    if (socket && currentLocation) {
+      const dataToSend = {
+        latitude: currentLocation.lat,
+        longitude: currentLocation.lng,
+        message: message,
+      };
+      socket.send(
+        JSON.stringify({ type: "send_notification", data: dataToSend })
+      );
+    }
+  };
+
   return (
     <>
       {flightsDisplayed.map((flight) => (
@@ -101,7 +88,6 @@ export default function FlightMap() {
           key={flight.plane_id}
           position={[flight.location.latitude, flight.location.longitude]}
           icon={flightIcon}
-          eventHandlers={{ click: () => setSelectedFlight(flight) }}
         >
           <Popup autoClose={true}>
             <div>
@@ -118,15 +104,16 @@ export default function FlightMap() {
                 {flight.location.latitude.toFixed(3)},{" "}
                 {flight.location.longitude.toFixed(3)}
               </p>
-              <input
-                type="text"
-                placeholder="Enter message"
-                value={message}
-                onChange={(e: any) => setMessage(e.target.value)}
-              />
-              <button onClick={sendNotification} className="mt-2">
-                Send Notification
-              </button>
+              <div>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Enter message"
+                />
+                <button onClick={handleSendMessage}>
+                  Send Location and Message
+                </button>
+              </div>
             </div>
           </Popup>
         </Marker>
