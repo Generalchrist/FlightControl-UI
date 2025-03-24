@@ -10,16 +10,13 @@ export default function FlightMap() {
   const [flightsDisplayed, setFlightsDisplayed] = useState<any[]>([]);
   const [currentBounds, setCurrentBounds] = useState<LatLngBounds | null>(null);
   const [message, setMessage] = useState("");
-  const flightsRef = useRef<Map<string, any>>(new Map()); // Persistent storage for planes
+
+  const flightsRef = useRef<Map<string, any>>(new Map());
   const [socket, setSocket] = useState<WebSocket | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<any>(null);
 
   const map = useMapEvents({
     moveend: () => {
       if (map) setCurrentBounds(map.getBounds());
-    },
-    locationfound: (event) => {
-      setCurrentLocation(event.latlng); // Set the current location on map
     },
   });
 
@@ -32,12 +29,16 @@ export default function FlightMap() {
 
     newSocket.addEventListener("message", (event) => {
       const data = JSON.parse(event.data);
+
+      if (data.type === "new_command") {
+        console.log("New Command:", data.data);
+      }
+
       if (data && Array.isArray(data.planes)) {
         data.planes.forEach((newPlane: any) => {
           flightsRef.current.set(newPlane.plane_id, newPlane);
         });
 
-        // Update the displayed planes only if they are within the current map bounds
         if (currentBounds) {
           setFlightsDisplayed(
             Array.from(flightsRef.current.values()).filter((flight) =>
@@ -59,7 +60,7 @@ export default function FlightMap() {
     return () => {
       newSocket.close();
     };
-  }, [currentBounds]); // Update only when WebSocket gets new data or bounds change
+  }, [currentBounds]);
 
   const flightIcon = divIcon({
     className: "flight-icon",
@@ -68,16 +69,15 @@ export default function FlightMap() {
     ),
   });
 
-  const handleSendMessage = () => {
-    if (socket && currentLocation) {
+  const handleSendCommand = (flight: any) => {
+    if (socket) {
       const dataToSend = {
-        latitude: currentLocation.lat,
-        longitude: currentLocation.lng,
+        plane_id: flight.plane_id,
+        pilot_id: flight.pilot_id,
+        drop_off_location: flight.location,
         message: message,
       };
-      socket.send(
-        JSON.stringify({ type: "send_notification", data: dataToSend })
-      );
+      socket.send(JSON.stringify({ type: "send_command", data: dataToSend }));
     }
   };
 
@@ -108,10 +108,10 @@ export default function FlightMap() {
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Enter message"
+                  placeholder="Enter command message"
                 />
-                <button onClick={handleSendMessage}>
-                  Send Location and Message
+                <button onClick={() => handleSendCommand(flight)}>
+                  Send Command to Vehicle
                 </button>
               </div>
             </div>
