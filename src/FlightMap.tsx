@@ -1,17 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import ReactDOM from "react-dom/server";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Marker, Popup } from "react-leaflet";
 import { useMapEvents } from "react-leaflet/hooks";
-import { LatLngBounds, divIcon } from "leaflet";
+import { LatLngBounds, LatLng, divIcon } from "leaflet";
 import { IoIosAirplane } from "react-icons/io";
-import testdata from "./testdata.json"
-// import axios from "axios";
 
 export default function FlightMap() {
-  const [flights, setFlights] = useState<any[][]>([]);
-  const [flightsDisplayed, setFlightsDisplayed] = useState<any[][]>([]);
+  const [flightsDisplayed, setFlightsDisplayed] = useState<any[]>([]);
   const [currentBounds, setCurrentBounds] = useState<LatLngBounds | null>(null);
+  const flightsRef = useRef<Map<string, any>>(new Map()); 
+  const [message, setMessage] = useState<string>("");
+  const [selectedFlight, setSelectedFlight] = useState<any | null>(null);
 
   const map = useMapEvents({
     moveend: () => {
@@ -19,33 +19,73 @@ export default function FlightMap() {
     },
   });
 
-  const fetchFlights = async () => {
+  useEffect(() => {
+    const newSocket = new WebSocket("ws://127.0.0.1:8000/ws/planes/");
+
+    newSocket.addEventListener("open", () => {
+      console.log("WebSocket connection established");
+    });
+
+    newSocket.addEventListener("message", (event) => {
+      const data = JSON.parse(event.data);
+      if (data && Array.isArray(data.planes)) {
+        data.planes.forEach((newPlane: any) => {
+          flightsRef.current.set(newPlane.plane_id, newPlane);
+        });
+
+
+        if (currentBounds) {
+          setFlightsDisplayed(
+            Array.from(flightsRef.current.values()).filter((flight) =>
+              currentBounds.contains(
+                new LatLng(flight.location.latitude, flight.location.longitude)
+              )
+            )
+          );
+        }
+      }
+    });
+
+    newSocket.addEventListener("close", () => {
+      console.log("WebSocket connection closed");
+    });
+
+    return () => {
+      newSocket.close();
+    };
+  }, [currentBounds]); 
+
+  const sendNotification = async () => {
+    if (!selectedFlight) return;
+
+    const payload = {
+      plane_id: selectedFlight.plane_id,
+      latitude: selectedFlight.location.latitude,
+      longitude: selectedFlight.location.longitude,
+      message,
+    };
+
     try {
-      const response = testdata;
-      setFlights(response.states.slice(0, 5000));
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/send_notification/",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (response.ok) {
+        alert("Notification sent successfully!");
+        setMessage("");
+      } else {
+        alert("Failed to send notification.");
+      }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error sending notification:", error);
+      alert("Error sending notification.");
     }
   };
-
-  useEffect(() => {
-    fetchFlights();
-    if (map) {
-      setCurrentBounds(map.getBounds());
-    }
-    const intervalId = setInterval(fetchFlights, 1000000);
-    return () => clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
-    if (flights.length && currentBounds) {
-      const flightsWithinBounds = flights.filter((flight) => {
-        if (!flight[5] || !flight[6]) return false;
-        return currentBounds.contains([flight[6], flight[5]]);
-      });
-      setFlightsDisplayed(flightsWithinBounds);
-    }
-  }, [currentBounds, flights]);
 
   const flightIcon = divIcon({
     className: "flight-icon",
@@ -56,46 +96,41 @@ export default function FlightMap() {
 
   return (
     <>
-      {flightsDisplayed.map((flight) => {
-        const key = flight[0];
-        const position: [number, number] | null =
-          flight[6] && flight[5] ? [flight[6], flight[5]] : null;
-
-        if (!position) return null;
-
-        return (
-          <Marker key={key} position={position} icon={flightIcon}>
-            <Popup autoClose={true}>
-              <div>
-                <p>
-                  <strong>ICAO24: </strong>
-                  {flight[0]}
-                </p>
-                <p>
-                  <strong>Callsign: </strong>
-                  {flight[1]}
-                </p>
-                <p>
-                  <strong>Origin: </strong>
-                  {flight[2]}
-                </p>
-                <p>
-                  <strong>Position: </strong>
-                  {position.join(", ")}
-                </p>
-                <p>
-                  <strong>Altitude: </strong>
-                  {flight[7] ? flight[7] : 0}
-                </p>
-                <p>
-                  <strong>Velocity: </strong>
-                  {flight[9]}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        );
-      })}
+      {flightsDisplayed.map((flight) => (
+        <Marker
+          key={flight.plane_id}
+          position={[flight.location.latitude, flight.location.longitude]}
+          icon={flightIcon}
+          eventHandlers={{ click: () => setSelectedFlight(flight) }}
+        >
+          <Popup autoClose={true}>
+            <div>
+              <p>
+                <strong>Plane ID: </strong>
+                {flight.plane_id}
+              </p>
+              <p>
+                <strong>Pilot ID: </strong>
+                {flight.pilot_id}
+              </p>
+              <p>
+                <strong>Position: </strong>
+                {flight.location.latitude.toFixed(3)},{" "}
+                {flight.location.longitude.toFixed(3)}
+              </p>
+              <input
+                type="text"
+                placeholder="Enter message"
+                value={message}
+                onChange={(e: any) => setMessage(e.target.value)}
+              />
+              <button onClick={sendNotification} className="mt-2">
+                Send Notification
+              </button>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
     </>
   );
 }
