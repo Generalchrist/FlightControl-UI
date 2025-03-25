@@ -29,7 +29,8 @@ export default function FlightMap() {
 
     newSocket.addEventListener("message", (event) => {
       const data = JSON.parse(event.data);
-
+      const date = new Date();
+      console.log(date.getSeconds())
       if (data.type === "new_command") {
         console.log("New Command:", data.data);
       }
