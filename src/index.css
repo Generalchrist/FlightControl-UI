@@ -11,3 +11,19 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+
+.flight-icon {
+  transition: transform 0.2s ease-in-out, filter 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.flight-icon:hover,
+.flight-icon:focus {
+  filter: drop-shadow(0px 0px 8px rgba(207, 150, 3, 0.8));
+}
+
+.flight-icon:hover svg,
+.flight-icon:focus svg {
+  fill: #ffcc00 !important;
+}

@@ -8,11 +8,17 @@ import { IoIosAirplane } from "react-icons/io";
 
 export default function FlightMap() {
   const [flightsDisplayed, setFlightsDisplayed] = useState<any[]>([]);
-  const [currentBounds, setCurrentBounds] = useState<LatLngBounds | null>(null);
+  const [currentBounds, setCurrentBounds] = useState<LatLngBounds | null>(
+    new LatLngBounds(
+      new LatLng(35.36217605914681, 24.455566406250004), // Southwest corner
+      new LatLng(42.45588764197166, 45.54931640625001) // Northeast corner
+    )
+  );
   const [message, setMessage] = useState("");
-
+  const [recieve, setRecieve] = useState(0);
   const flightsRef = useRef<Map<string, any>>(new Map());
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const ws = useRef(null);
 
   const map = useMapEvents({
     moveend: () => {
@@ -21,25 +27,34 @@ export default function FlightMap() {
   });
 
   useEffect(() => {
-    const newSocket = new WebSocket("ws://127.0.0.1:8000/ws/planes/");
+    ws.current = new WebSocket("ws://127.0.0.1:8000/ws/planes/");
 
-    newSocket.addEventListener("open", () => {
-      console.log("WebSocket connection established");
-    });
+    ws.current.onopen = () => console.log("ws opened");
+    ws.current.onclose = () => console.log("ws closed");
 
-    newSocket.addEventListener("message", (event) => {
+    setSocket(ws.current);
+
+    return () => {
+      ws.current.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ws.current) return;
+
+    ws.current.onmessage = (event: any) => {
       const data = JSON.parse(event.data);
-      const date = new Date();
-      console.log(date.getSeconds())
+
       if (data.type === "new_command") {
         console.log("New Command:", data.data);
       }
 
       if (data && Array.isArray(data.planes)) {
+        console.log(recieve);
+        setRecieve(recieve + 1);
         data.planes.forEach((newPlane: any) => {
           flightsRef.current.set(newPlane.plane_id, newPlane);
         });
-
         if (currentBounds) {
           setFlightsDisplayed(
             Array.from(flightsRef.current.values()).filter((flight) =>
@@ -50,18 +65,8 @@ export default function FlightMap() {
           );
         }
       }
-    });
-
-    newSocket.addEventListener("close", () => {
-      console.log("WebSocket connection closed");
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.close();
     };
-  }, [currentBounds]);
+  }, [recieve]);
 
   const flightIcon = divIcon({
     className: "flight-icon",
@@ -79,6 +84,7 @@ export default function FlightMap() {
         message: message,
       };
       socket.send(JSON.stringify({ type: "send_command", data: dataToSend }));
+      setMessage("");
     }
   };
 
@@ -89,6 +95,7 @@ export default function FlightMap() {
           key={flight.plane_id}
           position={[flight.location.latitude, flight.location.longitude]}
           icon={flightIcon}
+          autoPan={true}
         >
           <Popup autoClose={true}>
             <div>
