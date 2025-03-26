@@ -15,10 +15,9 @@ export default function FlightMap() {
     )
   );
   const [message, setMessage] = useState("");
-  const [recieve, setRecieve] = useState(0);
   const flightsRef = useRef<Map<string, any>>(new Map());
   const [socket, setSocket] = useState<WebSocket | null>(null);
-  const ws = useRef(null);
+  const ws = useRef(socket);
 
   const map = useMapEvents({
     moveend: () => {
@@ -35,7 +34,9 @@ export default function FlightMap() {
     setSocket(ws.current);
 
     return () => {
-      ws.current.close();
+      if (ws.current != null) {
+        ws.current.close();
+      }
     };
   }, []);
 
@@ -50,12 +51,11 @@ export default function FlightMap() {
       }
 
       if (data && Array.isArray(data.planes)) {
-        console.log(recieve);
-        setRecieve(recieve + 1);
         data.planes.forEach((newPlane: any) => {
           flightsRef.current.set(newPlane.plane_id, newPlane);
         });
         if (currentBounds) {
+          console.log(currentBounds.getNorthEast());
           setFlightsDisplayed(
             Array.from(flightsRef.current.values()).filter((flight) =>
               currentBounds.contains(
@@ -66,7 +66,7 @@ export default function FlightMap() {
         }
       }
     };
-  }, [recieve]);
+  }, [currentBounds]);
 
   const flightIcon = divIcon({
     className: "flight-icon",
