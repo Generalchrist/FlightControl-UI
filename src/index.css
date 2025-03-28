@@ -7,23 +7,123 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
-
-
 .flight-icon {
   transition: transform 0.2s ease-in-out, filter 0.2s ease-in-out;
   cursor: pointer;
 }
 
-.flight-icon:hover,
-.flight-icon:focus {
+.selected-flight {
   filter: drop-shadow(0px 0px 8px rgba(207, 150, 3, 0.8));
+  animation: pulse 1.5s ease-in-out infinite;
+  border: 2px dotted red; 
+  border-radius: 50%; 
 }
 
-.flight-icon:hover svg,
-.flight-icon:focus svg {
-  fill: #ffcc00 !important;
+@keyframes pulse {
+  0% {
+    background-color: red;
+  }
+
+  50% {
+    background-color: red;
+  }
+
+  100% {
+    box-shadow: red;
+  }
+}
+
+
+.leaflet-container {
+  z-index: 1;
+}
+
+.sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 300px;
+  height: 700px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: -3px 0px 10px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  overflow-y: auto;
+  z-index: 5000;
+  margin-top: 100px;
+  margin-left: 13px;
+}
+
+.close-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 16px;
+  float: right;
+  margin: 12px 0 12px 0;
+  border: none;
+  border-radius: 5px;
+}
+
+.sidebar-title {
+  display: flex;
+  justify-content: space-between;
+}
+
+.sidebar-icon {
+  font-size: 200px;
+  color: black;
+  margin-bottom: 10px;
+  width: 100%;
+  margin: 20px 0 20px 0;
+}
+
+.sidebar textarea {
+  width: -moz-available;
+  height: 80px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 14px;
+  resize: none;
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.sidebar textarea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.command-button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.3s ease;
+}
+
+.command-button:hover {
+  background: #0056b3;
+}
+
+.command-button:active {
+  background: #00408f;
+}
+
+.command-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.markerSelected {
+  transform: scale(1.5);
+  filter: drop-shadow(0px 0px 10px rgba(0, 0, 0, .5));
 }
